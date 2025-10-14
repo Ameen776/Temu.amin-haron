@@ -29,14 +29,19 @@
         .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #6a11cb; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite; margin: 0 auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .file-info { margin-top: 5px; font-size: 14px; color: #666; }
+        .api-status { background: #e8f5e8; padding: 10px; border-radius: 5px; margin: 10px 0; text-align: center; }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>متجر أمين الزواحي</h1>
-            <p>لوحة إدارة المنتجات - باستخدام ImgBB المجاني</p>
+            <p>لوحة إدارة المنتجات - مع ImgBB</p>
         </header>
+
+        <div class="api-status">
+            ✅ ImgBB API متصل وجاهز لرفع الصور
+        </div>
         
         <div class="admin-panel">
             <h2>إضافة منتج جديد</h2>
@@ -92,7 +97,7 @@
     </div>
 
     <script>
-        // تهيئة Firebase للبيانات فقط (بدون Storage)
+        // تهيئة Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyA0KMF-nZh5Y5DsHt9MWCfTLmyMDnWSAFc",
             authDomain: "temo2-2e66e.firebaseapp.com",
@@ -102,12 +107,11 @@
             measurementId: "G-4N04DMBMTP"
         };
 
-        // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         
-        // مفتاح API لـ ImgBB (مجاني)
-        const IMGBB_API_KEY = 'a5e0c2fbe4e8b2db1d1d8f8a5b7e3a3c'; // هذا مفتاح تجريبي
+        // مفتاح ImgBB API الحقيقي الخاص بك
+        const IMGBB_API_KEY = '358ea78b20f302743d9b1cbeec759b92';
         
         // معاينة الصورة ومعلومات الملف
         document.getElementById('productImage').addEventListener('change', function(e) {
@@ -140,21 +144,29 @@
         
         // رفع الصورة إلى ImgBB
         async function uploadToImgBB(imageFile) {
+            console.log('بدء رفع الصورة إلى ImgBB...');
+            
             const formData = new FormData();
             formData.append('image', imageFile);
             
-            // استخدام ImgBB API
-            const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-                method: 'POST',
-                body: formData
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                return data.data.url;
-            } else {
-                throw new Error(data.error.message || 'فشل في رفع الصورة');
+            try {
+                const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                console.log('استجابة ImgBB:', data);
+                
+                if (data.success) {
+                    console.log('✅ تم رفع الصورة بنجاح:', data.data.url);
+                    return data.data.url;
+                } else {
+                    throw new Error(data.error.message || 'فشل في رفع الصورة إلى ImgBB');
+                }
+            } catch (error) {
+                console.error('❌ خطأ في رفع الصورة:', error);
+                throw error;
             }
         }
         
@@ -173,20 +185,19 @@
                 return;
             }
             
-            // التحقق من حجم الصورة (لا تتعدى 10MB)
-            if (productImage.size > 10 * 1024 * 1024) {
-                showError('حجم الصورة كبير جداً. الحد الأقصى 10MB');
+            // التحقق من حجم الصورة (لا تتعدى 32MB - حد ImgBB)
+            if (productImage.size > 32 * 1024 * 1024) {
+                showError('حجم الصورة كبير جداً. الحد الأقصى 32MB');
                 return;
             }
             
             showLoading(true);
             
             try {
-                console.log('بدء رفع الصورة إلى ImgBB...');
+                console.log('بدء عملية إضافة المنتج...');
                 
                 // رفع الصورة إلى ImgBB
                 const imageUrl = await uploadToImgBB(productImage);
-                console.log('تم رفع الصورة بنجاح:', imageUrl);
                 
                 // إضافة بيانات المنتج إلى Firestore
                 const productData = {
@@ -194,7 +205,7 @@
                     price: parseFloat(productPrice),
                     description: productDescription,
                     category: productCategory,
-                    imageUrl: imageUrl,
+                    imageUrl: imageUrl, // نستخدم الرابط من ImgBB
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
                 
@@ -203,7 +214,7 @@
                 await db.collection('products').add(productData);
                 console.log('تم إضافة المنتج إلى Firestore');
                 
-                showSuccess('تم إضافة المنتج بنجاح!');
+                showSuccess('تم إضافة المنتج بنجاح! 🎉');
                 
                 // إعادة تعيين النموذج
                 document.getElementById('productForm').reset();
@@ -214,10 +225,10 @@
             } catch (error) {
                 console.error('Error:', error);
                 
-                if (error.message.includes('فشل في رفع الصورة')) {
-                    showError('فشل في رفع الصورة. جرب صورة أصغر حجماً أو صيغة مختلفة');
-                } else if (error.message.includes('API key')) {
-                    showError('مشكلة في خدمة رفع الصور. جرب لاحقاً');
+                if (error.message.includes('API key')) {
+                    showError('مشكلة في مفتاح ImgBB API. تأكد من أن المفتاح صحيح');
+                } else if (error.message.includes('File is too big')) {
+                    showError('حجم الصورة كبير جداً. جرب صورة أصغر');
                 } else {
                     showError('حدث خطأ أثناء إضافة المنتج: ' + error.message);
                 }
@@ -249,6 +260,35 @@
             document.getElementById('successMessage').style.display = 'none';
             setTimeout(() => { errorMessage.style.display = 'none'; }, 5000);
         }
+        
+        // اختبار اتصال ImgBB
+        async function testImgBB() {
+            try {
+                const testBlob = new Blob(['test'], { type: 'text/plain' });
+                const testFile = new File([testBlob], 'test.txt', { type: 'text/plain' });
+                
+                const result = await uploadToImgBB(testFile);
+                console.log('✅ اختبار ImgBB ناجح:', result);
+                return true;
+            } catch (error) {
+                console.error('❌ اختبار ImgBB فاشل:', error);
+                return false;
+            }
+        }
+        
+        // اختبار الاتصال عند التحميل
+        window.addEventListener('load', async () => {
+            console.log('جاري اختبار اتصال ImgBB...');
+            const isConnected = await testImgBB();
+            
+            if (isConnected) {
+                console.log('✅ ImgBB متصل ويعمل بشكل صحيح');
+            } else {
+                console.log('❌ هناك مشكلة في اتصال ImgBB');
+            }
+        });
+        
+        console.log('لوحة الإدارة جاهزة - مع ImgBB API');
     </script>
 </body>
 </html>
