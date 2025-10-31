@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /private/
+
+Sitemap: https://yourusername.github.io/sitemap.xml
+
+# Open Graph Crawlers
+User-agent: FacebookBot
+Allow: /
+Crawl-delay: 1
+
+User-agent: TwitterBot
+Allow: /
+Crawl-delay: 1
+
+User-agent: WhatsApp
+Allow: /
+Crawl-delay: 1
