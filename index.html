@@ -1,25 +1,37 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" prefix="og: https://ogp.me/ns#">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>متجر أمين الزواحي الإلكتروني</title>
     
-    <!-- Open Graph Meta Tags -->
-    <meta property="og:title" content="متجر أمين الزواحي الإلكتروني - أفضل المنتجات بأفضل الأسعار" />
-    <meta property="og:description" content="تسوق بذكاء، عيش براحة. اكتشف أحدث المنتجات بأفضل الأسعار في متجر أمين الزواحي. نقدم لك تجربة تسوق فريدة وآمنة." />
-    <meta property="og:image" content="https://i.imgur.com/gfK8eV7" />
-    <meta property="og:url" content="https://i.imgur.com/gfK8eV7" />
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="متجر أمين الزواحي" />
-    <meta property="og:locale" content="ar_SA" />
+    <!-- Primary Meta Tags -->
+    <title>متجر أمين الزواحي الإلكتروني - أفضل المنتجات بأفضل الأسعار</title>
+    <meta name="title" content="متجر أمين الزواحي الإلكتروني - أفضل المنتجات بأفضل الأسعار">
+    <meta name="description" content="تسوق بذكاء، عيش براحة. اكتشف أحدث المنتجات بأفضل الأسعار في متجر أمين الزواحي. نقدم لك تجربة تسوق فريدة وآمنة.">
     
-    <!-- Twitter Card Meta Tags -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="متجر أمين الزواحي الإلكتروني - أفضل المنتجات بأفضل الأسعار">
-    <meta name="twitter:description" content="تسوق بذكاء، عيش براحة. اكتشف أحدث المنتجات بأفضل الأسعار في متجر أمين الزواحي">
-    <meta name="twitter:image" content="https://i.imgur.com/gfK8eV7.png[/img]">
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://Ameen776.github.io/">
+    <meta property="og:title" content="متجر أمين الزواحي الإلكتروني - أفضل المنتجات بأفضل الأسعار">
+    <meta property="og:description" content="تسوق بذكاء، عيش براحة. اكتشف أحدث المنتجات بأفضل الأسعار في متجر أمين الزواحي. نقدم لك تجربة تسوق فريدة وآمنة.">
+    <meta property="og:image" content="https://i.imgur.com/gfK8eV7.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:locale" content="ar_SA">
+    <meta property="og:site_name" content="متجر أمين الزواحي">
     
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://Ameen776.github.io/">
+    <meta property="twitter:title" content="متجر أمين الزواحي الإلكتروني - أفضل المنتجات بأفضل الأسعار">
+    <meta property="twitter:description" content="تسوق بذكاء، عيش براحة. اكتشف أحدث المنتجات بأفضل الأسعار في متجر أمين الزواحي. نقدم لك تجربة تسوق فريدة وآمنة.">
+    <meta property="twitter:image" content="https://i.imgur.com/gfK8eV7.png">
+    
+    <!-- Additional Meta Tags -->
+    <meta name="robots" content="index, follow">
+    <meta name="author" content="متجر أمين الزواحي">
+    <meta name="keywords" content="متجر إلكتروني, تسوق, منتجات, عروض, أمين الزواحي, تسوق أونلاين">
+
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
     <style>
@@ -815,6 +827,23 @@
     </div>
 
     <script>
+        // اختبار وسوم Open Graph
+        console.log('=== Open Graph Meta Tags Test ===');
+        const metaTags = document.querySelectorAll('meta[property^="og:"], meta[property^="twitter:"]');
+        metaTags.forEach(tag => {
+            console.log(`${tag.getAttribute('property')}: ${tag.getAttribute('content')}`);
+        });
+
+        // التأكد من تحميل الصورة
+        const testImage = new Image();
+        testImage.src = 'https://i.imgur.com/gfK8eV7.png';
+        testImage.onload = function() {
+            console.log('✅ الصورة متاحة وتحمل بنجاح');
+        };
+        testImage.onerror = function() {
+            console.log('❌ خطأ في تحميل الصورة');
+        };
+
         // تهيئة Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyA0KMF-nZh5Y5DsHt9MWCfTLmyMDnWSAFc",
