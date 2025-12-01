@@ -885,6 +885,7 @@
             } else {
                 document.getElementById('mainContent').style.display = 'block';
                 updateUserDisplay();
+                loadProducts(); // تحميل المنتجات بعد تسجيل الدخول
             }
         }, 4000); // 4 ثواني
 
@@ -932,7 +933,7 @@
                     document.getElementById('registrationScreen').style.display = 'none';
                     document.getElementById('mainContent').style.display = 'block';
                     updateUserDisplay();
-                    loadProducts();
+                    loadProducts(); // تحميل المنتجات بعد التسجيل
                 }, 2000);
             }, 7000); // 7 ثواني
         });
@@ -973,14 +974,20 @@
             document.getElementById('profileDropdown').classList.remove('show');
         });
 
-        // تحميل المنتجات
+        // تحميل المنتجات - التعديل المهم هنا
         async function loadProducts() {
             const loadingElement = document.getElementById('loadingProducts');
             const productsGrid = document.getElementById('productsGrid');
             
             try {
                 loadingElement.style.display = 'block';
-                const querySnapshot = await db.collection('products').orderBy('createdAt', 'desc').get();
+                
+                // جلب فقط المنتجات المعتمدة
+                const querySnapshot = await db.collection('products')
+                    .where('approved', '==', true)
+                    .orderBy('createdAt', 'desc')
+                    .get();
+                    
                 products = [];
                 
                 querySnapshot.forEach(doc => {
@@ -993,7 +1000,25 @@
                 
             } catch (error) {
                 console.error('Error loading products:', error);
-                productsGrid.innerHTML = '<p>حدث خطأ في تحميل المنتجات</p>';
+                // إذا فشل الاستعلام بسبب الفهرس، نجلب كل المنتجات ثم نفلترها محلياً
+                try {
+                    const allProductsSnapshot = await db.collection('products').get();
+                    products = [];
+                    
+                    allProductsSnapshot.forEach(doc => {
+                        const product = doc.data();
+                        product.id = doc.id;
+                        // فلترة المنتجات المعتمدة فقط
+                        if (product.approved !== false) {
+                            products.push(product);
+                        }
+                    });
+                    
+                    displayProducts(products);
+                } catch (fallbackError) {
+                    console.error('Fallback error:', fallbackError);
+                    productsGrid.innerHTML = '<p>حدث خطأ في تحميل المنتجات</p>';
+                }
             } finally {
                 loadingElement.style.display = 'none';
             }
@@ -1235,8 +1260,8 @@
                         <div class="order-item-details">
                             <div class="order-item-name">طلب #${order.id.substring(0, 8)}</div>
                             <div class="order-item-price">المجموع: ${order.total.toFixed(2)} ر.س</div>
-                            <div class="order-status" style="color: ${order.status === 'completed' ? '#25d366' : '#ffa500'}; margin: 5px 0;">
-                                الحالة: ${order.status === 'completed' ? 'مكتمل' : 'قيد الانتظار'}
+                            <div class="order-status" style="color: ${order.status === 'completed' ? '#25d366' : order.status === 'rejected' ? '#e74c3c' : '#ffa500'}; margin: 5px 0;">
+                                الحالة: ${order.status === 'completed' ? 'مكتمل' : order.status === 'rejected' ? 'ملغي' : 'قيد الانتظار'}
                             </div>
                             <div class="order-date">${order.createdAt ? new Date(order.createdAt.toDate()).toLocaleDateString('ar-EG') : 'غير معروف'}</div>
                         </div>
@@ -1358,8 +1383,8 @@
             }
         });
         
-        // تحديث في الوقت الحقيقي
-        db.collection('products').onSnapshot(() => {
+        // تحديث في الوقت الحقيقي للمنتجات
+        db.collection('products').where('approved', '==', true).onSnapshot(() => {
             loadProducts();
         });
         
