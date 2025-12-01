@@ -8,6 +8,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-messaging-compat.js"></script>
     <style>
         * {
             margin: 0;
@@ -23,7 +24,7 @@
         }
         
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -142,6 +143,10 @@
             background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
         }
         
+        .btn-info {
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+        }
+        
         .success-message {
             background-color: #d4edda;
             color: #155724;
@@ -181,7 +186,7 @@
             100% { transform: rotate(360deg); }
         }
         
-        .products-list, .orders-list {
+        .products-list, .orders-list, .notifications-list {
             background-color: white;
             border-radius: 10px;
             padding: 30px;
@@ -189,14 +194,14 @@
             margin-bottom: 30px;
         }
         
-        .products-list h2, .orders-list h2 {
+        .products-list h2, .orders-list h2, .notifications-list h2 {
             margin-bottom: 20px;
             color: #333;
             border-bottom: 2px solid #f0f0f0;
             padding-bottom: 10px;
         }
         
-        .product-item, .order-item {
+        .product-item, .order-item, .notification-item {
             display: flex;
             border: 1px solid #eee;
             border-radius: 8px;
@@ -236,11 +241,13 @@
             font-size: 16px;
         }
         
-        .product-status {
+        .product-status, .order-status {
             padding: 5px 10px;
             border-radius: 20px;
             font-size: 14px;
             font-weight: 600;
+            display: inline-block;
+            margin-top: 5px;
         }
         
         .status-pending {
@@ -258,16 +265,28 @@
             color: #721c24;
         }
         
+        .status-completed {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status-processing {
+            background-color: #cce5ff;
+            color: #004085;
+        }
+        
         .tabs {
             display: flex;
             margin-bottom: 20px;
             border-bottom: 1px solid #ddd;
+            flex-wrap: wrap;
         }
         
         .tab {
             padding: 10px 20px;
             cursor: pointer;
             border-bottom: 3px solid transparent;
+            position: relative;
         }
         
         .tab.active {
@@ -295,8 +314,41 @@
             justify-content: center;
             font-size: 12px;
             position: absolute;
-            top: -5px;
-            right: -5px;
+            top: 5px;
+            right: 5px;
+        }
+        
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        .stat-card h3 {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .stat-card .number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #6a11cb;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
         }
         
         @media (max-width: 768px) {
@@ -308,7 +360,7 @@
                 font-size: 2rem;
             }
             
-            .product-item, .order-item {
+            .product-item, .order-item, .notification-item {
                 flex-direction: column;
                 align-items: flex-start;
             }
@@ -318,11 +370,14 @@
                 margin-bottom: 10px;
             }
             
-            .product-actions {
+            .action-buttons {
                 margin-top: 10px;
                 width: 100%;
-                display: flex;
-                justify-content: space-between;
+            }
+            
+            .tabs {
+                overflow-x: auto;
+                white-space: nowrap;
             }
         }
     </style>
@@ -330,13 +385,34 @@
 <body>
     <div class="container">
         <header>
-            <h1>متجر أمين الزواحي - لوحة الإدارة</h1>
-            <p>إدارة المنتجات والطلبات - متصل بقاعدة البيانات</p>
+            <h1>متجر أمين الزواحي - لوحة الإدارة الكاملة</h1>
+            <p>إدارة المنتجات، الطلبات، الإشعارات - متصل بقاعدة البيانات مباشرة</p>
         </header>
+        
+        <div class="stats-cards">
+            <div class="stat-card">
+                <h3>إجمالي المنتجات</h3>
+                <div class="number" id="totalProducts">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>الطلبات الجديدة</h3>
+                <div class="number" id="newOrders">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>المبيعات اليوم</h3>
+                <div class="number" id="todaySales">0 ر.س</div>
+            </div>
+            <div class="stat-card">
+                <h3>إجمالي المبيعات</h3>
+                <div class="number" id="totalSales">0 ر.س</div>
+            </div>
+        </div>
         
         <div class="tabs">
             <div class="tab active" data-tab="products">إدارة المنتجات</div>
             <div class="tab" data-tab="orders">إدارة الطلبات <span id="ordersBadge" class="notification-badge" style="display: none;">0</span></div>
+            <div class="tab" data-tab="notifications">الإشعارات <span id="notificationsBadge" class="notification-badge" style="display: none;">0</span></div>
+            <div class="tab" data-tab="settings">الإعدادات</div>
         </div>
         
         <div class="tab-content active" id="products-tab">
@@ -344,22 +420,22 @@
                 <h2>إضافة منتج جديد</h2>
                 <form id="productForm">
                     <div class="form-group">
-                        <label for="productName">اسم المنتج</label>
-                        <input type="text" id="productName" required>
+                        <label for="productName">اسم المنتج *</label>
+                        <input type="text" id="productName" required placeholder="أدخل اسم المنتج">
                     </div>
                     
                     <div class="form-group">
-                        <label for="productPrice">سعر المنتج ($)</label>
-                        <input type="number" id="productPrice" min="0" step="0.01" required>
+                        <label for="productPrice">سعر المنتج (ر.س) *</label>
+                        <input type="number" id="productPrice" min="0" step="0.01" required placeholder="أدخل السعر">
                     </div>
                     
                     <div class="form-group">
-                        <label for="productDescription">وصف المنتج</label>
-                        <textarea id="productDescription" required></textarea>
+                        <label for="productDescription">وصف المنتج *</label>
+                        <textarea id="productDescription" required placeholder="أدخل وصف المنتج"></textarea>
                     </div>
                     
                     <div class="form-group">
-                        <label for="productCategory">فئة المنتج</label>
+                        <label for="productCategory">فئة المنتج *</label>
                         <select id="productCategory" required>
                             <option value="">اختر الفئة</option>
                             <option value="electronics">إلكترونيات</option>
@@ -367,11 +443,18 @@
                             <option value="home">منزل</option>
                             <option value="sports">رياضة</option>
                             <option value="beauty">جمال</option>
+                            <option value="food">أطعمة</option>
+                            <option value="books">كتب</option>
                         </select>
                     </div>
                     
                     <div class="form-group">
-                        <label for="productImage">صورة المنتج</label>
+                        <label for="productStock">الكمية المتاحة *</label>
+                        <input type="number" id="productStock" min="0" required value="1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="productImage">صورة المنتج *</label>
                         <input type="file" id="productImage" accept="image/*" required>
                         <div class="image-preview">
                             <img id="imagePreview" src="#" alt="معاينة الصورة">
@@ -385,6 +468,7 @@
                     </div>
                     
                     <button type="submit" class="btn" id="submitBtn">إضافة المنتج</button>
+                    <button type="button" class="btn btn-info" id="testConnection">اختبار الاتصال</button>
                     
                     <div class="success-message" id="successMessage">
                         تم إضافة المنتج بنجاح!
@@ -397,7 +481,7 @@
             </div>
             
             <div class="products-list">
-                <h2>المنتجات المضافة</h2>
+                <h2>المنتجات المضافة <span id="productsCount">(0)</span></h2>
                 <div id="productsContainer">
                     <!-- سيتم عرض المنتجات هنا -->
                 </div>
@@ -406,16 +490,72 @@
         
         <div class="tab-content" id="orders-tab">
             <div class="orders-list">
-                <h2>طلبات العملاء</h2>
+                <h2>طلبات العملاء <span id="ordersCount">(0)</span></h2>
+                <div class="action-buttons" style="margin-bottom: 20px;">
+                    <button class="btn btn-success" onclick="filterOrders('all')">الكل</button>
+                    <button class="btn btn-warning" onclick="filterOrders('pending')">قيد الانتظار</button>
+                    <button class="btn btn-info" onclick="filterOrders('processing')">قيد التجهيز</button>
+                    <button class="btn btn-success" onclick="filterOrders('completed')">مكتملة</button>
+                    <button class="btn btn-danger" onclick="filterOrders('rejected')">ملغية</button>
+                </div>
                 <div id="ordersContainer">
                     <!-- سيتم عرض الطلبات هنا -->
                 </div>
             </div>
         </div>
+        
+        <div class="tab-content" id="notifications-tab">
+            <div class="notifications-list">
+                <h2>الإشعارات والتنبيهات <span id="notificationsCount">(0)</span></h2>
+                <button class="btn btn-danger" onclick="clearAllNotifications()">حذف جميع الإشعارات</button>
+                <div id="notificationsContainer">
+                    <!-- سيتم عرض الإشعارات هنا -->
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="settings-tab">
+            <div class="admin-panel">
+                <h2>إعدادات النظام</h2>
+                <div class="form-group">
+                    <label for="storeName">اسم المتجر</label>
+                    <input type="text" id="storeName" value="متجر أمين الزواحي">
+                </div>
+                
+                <div class="form-group">
+                    <label for="storePhone">رقم هاتف المتجر</label>
+                    <input type="tel" id="storePhone" value="0123456789">
+                </div>
+                
+                <div class="form-group">
+                    <label for="storeWhatsapp">رقم واتساب</label>
+                    <input type="tel" id="storeWhatsapp" value="0123456789">
+                </div>
+                
+                <div class="form-group">
+                    <label for="storeAddress">عنوان المتجر</label>
+                    <textarea id="storeAddress">شارع التسوق، المدينة</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="shippingCost">تكلفة الشحن (ر.س)</label>
+                    <input type="number" id="shippingCost" value="15">
+                </div>
+                
+                <div class="form-group">
+                    <label for="freeShipping">الشحن المجاني للطلبات فوق (ر.س)</label>
+                    <input type="number" id="freeShipping" value="100">
+                </div>
+                
+                <button class="btn btn-success" onclick="saveSettings()">حفظ الإعدادات</button>
+                <button class="btn" onclick="exportData()">تصدير البيانات</button>
+                <button class="btn btn-danger" onclick="clearAllData()">حذف جميع البيانات</button>
+            </div>
+        </div>
     </div>
 
     <script>
-        // تهيئة Firebase
+        // تهيئة Firebase باستخدام الكود الصحيح
         const firebaseConfig = {
             apiKey: "AIzaSyA0KMF-nZh5Y5DsHt9MWCfTLmyMDnWSAFc",
             authDomain: "temo2-2e66e.firebaseapp.com",
@@ -427,11 +567,22 @@
         };
 
         // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
+        try {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            } else {
+                firebase.app(); // إذا كان مثبتاً بالفعل
+            }
+        } catch (error) {
+            console.error('Error initializing Firebase:', error);
+        }
         
         // الحصول على مراجع Firebase
         const db = firebase.firestore();
         const storage = firebase.storage();
+        
+        // متغيرات النظام
+        let currentOrdersFilter = 'all';
         
         // نظام التبويبات
         document.querySelectorAll('.tab').forEach(tab => {
@@ -448,6 +599,10 @@
                 // إذا كان تبويب الطلبات، قم بتحميل الطلبات
                 if (tabId === 'orders') {
                     loadOrders();
+                } else if (tabId === 'notifications') {
+                    loadNotifications();
+                } else if (tabId === 'products') {
+                    loadProducts();
                 }
             });
         });
@@ -474,6 +629,37 @@
             }
         });
         
+        // اختبار الاتصال
+        document.getElementById('testConnection').addEventListener('click', async function() {
+            try {
+                showLoading(true);
+                // اختبار الاتصال مع Firestore
+                const testDoc = await db.collection('test').add({
+                    test: true,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                // حذف المستند الاختباري
+                await db.collection('test').doc(testDoc.id).delete();
+                
+                showSuccess('الاتصال مع Firebase يعمل بشكل صحيح!');
+                
+                // اختبار Storage
+                const testFile = new Blob(['test'], { type: 'text/plain' });
+                const storageRef = storage.ref('test/test.txt');
+                await storageRef.put(testFile);
+                await storageRef.delete();
+                
+                showSuccess('التخزين يعمل بشكل صحيح!');
+                
+            } catch (error) {
+                console.error('Connection test failed:', error);
+                showError('فشل اختبار الاتصال: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        });
+        
         // إضافة منتج جديد
         document.getElementById('productForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -482,11 +668,17 @@
             const productPrice = document.getElementById('productPrice').value;
             const productDescription = document.getElementById('productDescription').value;
             const productCategory = document.getElementById('productCategory').value;
+            const productStock = document.getElementById('productStock').value;
             const productImage = document.getElementById('productImage').files[0];
             
-            // التحقق من وجود صورة
+            // التحقق من البيانات
             if (!productImage) {
                 showError('يرجى اختيار صورة للمنتج');
+                return;
+            }
+            
+            if (!productName || !productPrice || !productDescription || !productCategory) {
+                showError('يرجى ملء جميع الحقول المطلوبة');
                 return;
             }
             
@@ -506,16 +698,22 @@
                     price: parseFloat(productPrice),
                     description: productDescription,
                     category: productCategory,
+                    stock: parseInt(productStock),
                     imageUrl: imageUrl,
-                    status: 'approved', // الموافقة المباشرة على المنتج
-                    approved: true, // إضافة حقل للموافقة
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    status: 'approved',
+                    approved: true,
+                    featured: false,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
                 
-                await db.collection('products').add(productData);
+                const docRef = await db.collection('products').add(productData);
+                
+                // إضافة إشعار
+                await addNotification('منتج جديد', `تم إضافة منتج جديد: ${productName}`, 'success');
                 
                 // إظهار رسالة النجاح
-                showSuccess('تم إضافة المنتج بنجاح وظهر في المتجر!');
+                showSuccess(`تم إضافة المنتج "${productName}" بنجاح! الرقم: ${docRef.id.substring(0, 8)}`);
                 
                 // إعادة تعيين النموذج
                 document.getElementById('productForm').reset();
@@ -524,6 +722,7 @@
                 
                 // تحديث قائمة المنتجات
                 loadProducts();
+                updateStats();
                 
             } catch (error) {
                 console.error('Error adding product:', error);
@@ -539,6 +738,9 @@
                 const productsContainer = document.getElementById('productsContainer');
                 const querySnapshot = await db.collection('products').orderBy('createdAt', 'desc').get();
                 
+                const productsCount = document.getElementById('productsCount');
+                productsCount.textContent = `(${querySnapshot.size})`;
+                
                 if (querySnapshot.empty) {
                     productsContainer.innerHTML = '<p>لا توجد منتجات مضافة بعد.</p>';
                     return;
@@ -553,24 +755,33 @@
                     const productItem = document.createElement('div');
                     productItem.className = 'product-item';
                     productItem.innerHTML = `
-                        <div style="display: flex; align-items: center;">
+                        <div style="display: flex; align-items: center; flex: 1;">
                             <div class="product-image">
-                                <img src="${product.imageUrl}" alt="${product.name}">
+                                <img src="${product.imageUrl}" alt="${product.name}" onerror="this.src='https://via.placeholder.com/80x80?text=صورة'">
                             </div>
-                            <div class="product-details">
+                            <div class="product-details" style="flex: 1;">
                                 <div class="product-name">${product.name}</div>
-                                <div class="product-description">${product.description}</div>
-                                <div class="product-price">$${product.price}</div>
+                                <div class="product-description" style="color: #666; font-size: 14px; margin: 5px 0;">${product.description.substring(0, 100)}${product.description.length > 100 ? '...' : ''}</div>
+                                <div class="product-price">${product.price} ر.س</div>
+                                <div style="display: flex; gap: 10px; margin-top: 5px;">
+                                    <span>الفئة: ${getCategoryName(product.category)}</span>
+                                    <span>المخزون: ${product.stock || 0}</span>
+                                </div>
                                 <div class="product-status ${product.approved ? 'status-approved' : 'status-pending'}">
                                     ${product.approved ? 'معتمد' : 'بانتظار الموافقة'}
                                 </div>
                             </div>
                         </div>
-                        <div class="product-actions">
+                        <div class="action-buttons">
                             ${!product.approved ? 
                                 `<button class="btn btn-success" onclick="approveProduct('${productId}')">موافقة</button>` : 
                                 `<button class="btn btn-warning" onclick="disapproveProduct('${productId}')">إلغاء الموافقة</button>`
                             }
+                            ${product.featured ? 
+                                `<button class="btn btn-info" onclick="unfeatureProduct('${productId}')">إلغاء التميز</button>` :
+                                `<button class="btn btn-info" onclick="featureProduct('${productId}')">تمييز</button>`
+                            }
+                            <button class="btn" onclick="editProduct('${productId}')">تعديل</button>
                             <button class="btn btn-danger" onclick="deleteProduct('${productId}')">حذف</button>
                         </div>
                     `;
@@ -587,7 +798,17 @@
         async function loadOrders() {
             try {
                 const ordersContainer = document.getElementById('ordersContainer');
-                const querySnapshot = await db.collection('orders').orderBy('createdAt', 'desc').get();
+                let query = db.collection('orders').orderBy('createdAt', 'desc');
+                
+                // تطبيق الفلتر
+                if (currentOrdersFilter !== 'all') {
+                    query = query.where('status', '==', currentOrdersFilter);
+                }
+                
+                const querySnapshot = await query.get();
+                
+                const ordersCount = document.getElementById('ordersCount');
+                ordersCount.textContent = `(${querySnapshot.size})`;
                 
                 if (querySnapshot.empty) {
                     ordersContainer.innerHTML = '<p>لا توجد طلبات حتى الآن.</p>';
@@ -605,36 +826,49 @@
                     
                     let itemsHtml = '';
                     if (order.items && order.items.length > 0) {
-                        order.items.forEach(item => {
+                        order.items.forEach((item, index) => {
                             itemsHtml += `
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                    <span>${item.name} (${item.quantity})</span>
-                                    <span>${item.price * item.quantity} ر.س</span>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; padding: 5px; background: #f9f9f9; border-radius: 3px;">
+                                    <span>${index + 1}. ${item.name} (${item.quantity})</span>
+                                    <span>${(item.price * item.quantity).toFixed(2)} ر.س</span>
                                 </div>
                             `;
                         });
                     }
                     
+                    const statusText = {
+                        'pending': 'قيد الانتظار',
+                        'processing': 'قيد التجهيز',
+                        'completed': 'مكتمل',
+                        'rejected': 'ملغي'
+                    }[order.status] || order.status;
+                    
                     orderItem.innerHTML = `
                         <div style="flex: 1;">
-                            <div style="font-weight: bold; margin-bottom: 10px;">طلب #${orderId.substring(0, 8)}</div>
-                            <div style="margin-bottom: 5px;"><strong>العميل:</strong> ${order.userName}</div>
-                            <div style="margin-bottom: 5px;"><strong>الهاتف:</strong> ${order.userPhone}</div>
-                            <div style="margin-bottom: 5px;"><strong>العنوان:</strong> ${order.userAddress}</div>
-                            <div style="margin-bottom: 10px;"><strong>البلد:</strong> ${order.userCountry}</div>
-                            <div style="margin-bottom: 10px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                                <div style="font-weight: bold;">طلب #${orderId.substring(0, 8)}</div>
+                                <div class="order-status ${'status-' + order.status}">${statusText}</div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 10px;">
+                                <div><strong>العميل:</strong> ${order.userName}</div>
+                                <div><strong>الهاتف:</strong> ${order.userPhone}</div>
+                                <div><strong>البلد:</strong> ${order.userCountry}</div>
+                                <div><strong>التاريخ:</strong> ${order.createdAt ? new Date(order.createdAt.toDate()).toLocaleString('ar-EG') : 'غير معروف'}</div>
+                            </div>
+                            <div><strong>العنوان:</strong> ${order.userAddress}</div>
+                            <div style="margin: 10px 0;">
                                 <strong>المنتجات:</strong>
-                                <div style="margin-top: 5px;">${itemsHtml}</div>
+                                <div style="margin-top: 5px; max-height: 150px; overflow-y: auto;">${itemsHtml}</div>
                             </div>
-                            <div style="font-weight: bold; color: #6a11cb;">المجموع: ${order.total} ر.س</div>
-                            <div class="product-status ${order.status === 'completed' ? 'status-approved' : order.status === 'rejected' ? 'status-rejected' : 'status-pending'}" style="margin-top: 10px;">
-                                ${order.status === 'completed' ? 'مكتمل' : order.status === 'rejected' ? 'ملغي' : 'قيد المعالجة'}
-                            </div>
+                            <div style="font-weight: bold; color: #6a11cb; font-size: 18px;">المجموع: ${order.total ? order.total.toFixed(2) : '0.00'} ر.س</div>
                         </div>
-                        <div class="product-actions">
-                            <button class="btn btn-success" onclick="updateOrderStatus('${orderId}', 'completed')">تم التسليم</button>
-                            <button class="btn btn-danger" onclick="updateOrderStatus('${orderId}', 'rejected')">إلغاء الطلب</button>
-                            <button class="btn" onclick="contactCustomer('${order.userPhone}', '${order.userName}')">اتصال بالعميل</button>
+                        <div class="action-buttons">
+                            <button class="btn btn-info" onclick="viewOrderDetails('${orderId}')">تفاصيل</button>
+                            <button class="btn btn-success" onclick="updateOrderStatus('${orderId}', 'processing')">تجهيز</button>
+                            <button class="btn btn-success" onclick="updateOrderStatus('${orderId}', 'completed')">تسليم</button>
+                            <button class="btn btn-danger" onclick="updateOrderStatus('${orderId}', 'rejected')">إلغاء</button>
+                            <button class="btn" onclick="contactCustomer('${order.userPhone}', '${order.userName}')">اتصال</button>
+                            <button class="btn btn-danger" onclick="deleteOrder('${orderId}')">حذف</button>
                         </div>
                     `;
                     
@@ -650,7 +884,107 @@
             }
         }
         
-        // تحديث شارة الإشعارات للطلبات
+        // تصفية الطلبات
+        function filterOrders(status) {
+            currentOrdersFilter = status;
+            loadOrders();
+        }
+        
+        // تحميل الإشعارات
+        async function loadNotifications() {
+            try {
+                const notificationsContainer = document.getElementById('notificationsContainer');
+                const querySnapshot = await db.collection('notifications').orderBy('timestamp', 'desc').get();
+                
+                const notificationsCount = document.getElementById('notificationsCount');
+                notificationsCount.textContent = `(${querySnapshot.size})`;
+                
+                if (querySnapshot.empty) {
+                    notificationsContainer.innerHTML = '<p>لا توجد إشعارات حتى الآن.</p>';
+                    return;
+                }
+                
+                notificationsContainer.innerHTML = '';
+                
+                querySnapshot.forEach(doc => {
+                    const notification = doc.data();
+                    const notificationId = doc.id;
+                    
+                    const notificationItem = document.createElement('div');
+                    notificationItem.className = 'notification-item';
+                    
+                    const typeClass = {
+                        'success': 'status-approved',
+                        'warning': 'status-pending',
+                        'error': 'status-rejected',
+                        'info': 'status-processing'
+                    }[notification.type] || 'status-processing';
+                    
+                    notificationItem.innerHTML = `
+                        <div style="flex: 1;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <div style="font-weight: bold;">${notification.title}</div>
+                                <div class="product-status ${typeClass}">${notification.type === 'success' ? 'نجاح' : notification.type === 'warning' ? 'تحذير' : notification.type === 'error' ? 'خطأ' : 'معلومات'}</div>
+                            </div>
+                            <div>${notification.message}</div>
+                            <div style="color: #666; font-size: 12px; margin-top: 5px;">
+                                ${notification.timestamp ? new Date(notification.timestamp.toDate()).toLocaleString('ar-EG') : 'غير معروف'}
+                            </div>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="btn btn-danger" onclick="deleteNotification('${notificationId}')">حذف</button>
+                        </div>
+                    `;
+                    
+                    notificationsContainer.appendChild(notificationItem);
+                });
+                
+                // تحديث شارة الإشعارات
+                updateNotificationsBadge();
+                
+            } catch (error) {
+                console.error('Error loading notifications:', error);
+                notificationsContainer.innerHTML = '<p>حدث خطأ في تحميل الإشعارات</p>';
+            }
+        }
+        
+        // إضافة إشعار جديد
+        async function addNotification(title, message, type = 'info') {
+            try {
+                await db.collection('notifications').add({
+                    title: title,
+                    message: message,
+                    type: type,
+                    read: false,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                updateNotificationsBadge();
+            } catch (error) {
+                console.error('Error adding notification:', error);
+            }
+        }
+        
+        // تحديث شارة الإشعارات
+        async function updateNotificationsBadge() {
+            try {
+                const querySnapshot = await db.collection('notifications')
+                    .where('read', '==', false)
+                    .get();
+                
+                const badge = document.getElementById('notificationsBadge');
+                if (querySnapshot.size > 0) {
+                    badge.textContent = querySnapshot.size;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error updating notifications badge:', error);
+            }
+        }
+        
+        // تحديث شارة الطلبات
         async function updateOrdersBadge() {
             try {
                 const querySnapshot = await db.collection('orders')
@@ -669,13 +1003,66 @@
             }
         }
         
+        // تحديث الإحصائيات
+        async function updateStats() {
+            try {
+                // إجمالي المنتجات
+                const productsSnapshot = await db.collection('products').get();
+                document.getElementById('totalProducts').textContent = productsSnapshot.size;
+                
+                // الطلبات الجديدة (قيد الانتظار)
+                const pendingOrdersSnapshot = await db.collection('orders')
+                    .where('status', '==', 'pending')
+                    .get();
+                document.getElementById('newOrders').textContent = pendingOrdersSnapshot.size;
+                
+                // المبيعات اليوم
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                
+                const todayOrdersSnapshot = await db.collection('orders')
+                    .where('status', '==', 'completed')
+                    .where('createdAt', '>=', firebase.firestore.Timestamp.fromDate(today))
+                    .get();
+                
+                let todaySales = 0;
+                todayOrdersSnapshot.forEach(doc => {
+                    const order = doc.data();
+                    todaySales += order.total || 0;
+                });
+                document.getElementById('todaySales').textContent = todaySales.toFixed(2) + ' ر.س';
+                
+                // إجمالي المبيعات
+                const allOrdersSnapshot = await db.collection('orders')
+                    .where('status', '==', 'completed')
+                    .get();
+                
+                let totalSales = 0;
+                allOrdersSnapshot.forEach(doc => {
+                    const order = doc.data();
+                    totalSales += order.total || 0;
+                });
+                document.getElementById('totalSales').textContent = totalSales.toFixed(2) + ' ر.س';
+                
+            } catch (error) {
+                console.error('Error updating stats:', error);
+            }
+        }
+        
         // الموافقة على منتج
         async function approveProduct(productId) {
             try {
                 await db.collection('products').doc(productId).update({
                     approved: true,
-                    status: 'approved'
+                    status: 'approved',
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
+                
+                // إضافة إشعار
+                const productDoc = await db.collection('products').doc(productId).get();
+                const productName = productDoc.data()?.name || 'منتج';
+                await addNotification('موافقة على منتج', `تمت الموافقة على المنتج: ${productName}`, 'success');
+                
                 showSuccess('تمت الموافقة على المنتج بنجاح!');
                 loadProducts();
             } catch (error) {
@@ -689,8 +1076,10 @@
             try {
                 await db.collection('products').doc(productId).update({
                     approved: false,
-                    status: 'pending'
+                    status: 'pending',
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
+                
                 showSuccess('تم إلغاء الموافقة على المنتج!');
                 loadProducts();
             } catch (error) {
@@ -699,18 +1088,137 @@
             }
         }
         
-        // تحديث حالة الطلب
-        async function updateOrderStatus(orderId, status) {
+        // تمييز منتج
+        async function featureProduct(productId) {
             try {
-                await db.collection('orders').doc(orderId).update({
-                    status: status,
+                await db.collection('products').doc(productId).update({
+                    featured: true,
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                showSuccess(`تم تحديث حالة الطلب إلى ${status === 'completed' ? 'مكتمل' : 'ملغي'}`);
-                loadOrders();
+                
+                showSuccess('تم تمييز المنتج بنجاح!');
+                loadProducts();
             } catch (error) {
-                console.error('Error updating order status:', error);
-                showError('حدث خطأ أثناء تحديث حالة الطلب');
+                console.error('Error featuring product:', error);
+                showError('حدث خطأ أثناء تمييز المنتج');
+            }
+        }
+        
+        // إلغاء تمييز منتج
+        async function unfeatureProduct(productId) {
+            try {
+                await db.collection('products').doc(productId).update({
+                    featured: false,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                showSuccess('تم إلغاء تمييز المنتج!');
+                loadProducts();
+            } catch (error) {
+                console.error('Error unfeaturing product:', error);
+                showError('حدث خطأ أثناء إلغاء تمييز المنتج');
+            }
+        }
+        
+        // تعديل منتج
+        async function editProduct(productId) {
+            const productDoc = await db.collection('products').doc(productId).get();
+            const product = productDoc.data();
+            
+            if (!product) return;
+            
+            const newName = prompt('أدخل الاسم الجديد للمنتج:', product.name);
+            if (!newName) return;
+            
+            const newPrice = prompt('أدخل السعر الجديد للمنتج:', product.price);
+            if (!newPrice) return;
+            
+            const newDescription = prompt('أدخل الوصف الجديد للمنتج:', product.description);
+            if (!newDescription) return;
+            
+            try {
+                await db.collection('products').doc(productId).update({
+                    name: newName,
+                    price: parseFloat(newPrice),
+                    description: newDescription,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                showSuccess('تم تعديل المنتج بنجاح!');
+                loadProducts();
+            } catch (error) {
+                console.error('Error editing product:', error);
+                showError('حدث خطأ أثناء تعديل المنتج');
+            }
+        }
+        
+        // تحديث حالة الطلب
+        async function updateOrderStatus(orderId, status) {
+            const statusText = {
+                'pending': 'قيد الانتظار',
+                'processing': 'قيد التجهيز',
+                'completed': 'مكتمل',
+                'rejected': 'ملغي'
+            }[status] || status;
+            
+            if (confirm(`هل تريد تغيير حالة الطلب إلى "${statusText}"؟`)) {
+                try {
+                    await db.collection('orders').doc(orderId).update({
+                        status: status,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    // إضافة إشعار
+                    const orderDoc = await db.collection('orders').doc(orderId).get();
+                    const orderNumber = orderId.substring(0, 8);
+                    await addNotification('تحديث حالة الطلب', `تم تحديث حالة الطلب #${orderNumber} إلى ${statusText}`, 'info');
+                    
+                    showSuccess(`تم تحديث حالة الطلب إلى ${statusText}`);
+                    loadOrders();
+                    updateStats();
+                } catch (error) {
+                    console.error('Error updating order status:', error);
+                    showError('حدث خطأ أثناء تحديث حالة الطلب');
+                }
+            }
+        }
+        
+        // عرض تفاصيل الطلب
+        async function viewOrderDetails(orderId) {
+            try {
+                const orderDoc = await db.collection('orders').doc(orderId).get();
+                const order = orderDoc.data();
+                
+                if (!order) {
+                    showError('الطلب غير موجود');
+                    return;
+                }
+                
+                let itemsText = '';
+                if (order.items && order.items.length > 0) {
+                    order.items.forEach((item, index) => {
+                        itemsText += `${index + 1}. ${item.name} - الكمية: ${item.quantity} - السعر: ${item.price} ر.س - الإجمالي: ${item.price * item.quantity} ر.س\n`;
+                    });
+                }
+                
+                const details = `
+                    رقم الطلب: ${orderId.substring(0, 8)}
+                    العميل: ${order.userName}
+                    الهاتف: ${order.userPhone}
+                    البلد: ${order.userCountry}
+                    العنوان: ${order.userAddress}
+                    الحالة: ${order.status}
+                    التاريخ: ${order.createdAt ? new Date(order.createdAt.toDate()).toLocaleString('ar-EG') : 'غير معروف'}
+                    المجموع: ${order.total ? order.total.toFixed(2) : '0.00'} ر.س
+                    
+                    المنتجات:
+                    ${itemsText}
+                `;
+                
+                alert(details);
+            } catch (error) {
+                console.error('Error viewing order details:', error);
+                showError('حدث خطأ أثناء عرض تفاصيل الطلب');
             }
         }
         
@@ -726,11 +1234,185 @@
             if (confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
                 try {
                     await db.collection('products').doc(productId).delete();
+                    
+                    // إضافة إشعار
+                    await addNotification('حذف منتج', 'تم حذف منتج من المتجر', 'warning');
+                    
                     showSuccess('تم حذف المنتج بنجاح!');
                     loadProducts();
+                    updateStats();
                 } catch (error) {
                     console.error('Error deleting product:', error);
                     showError('حدث خطأ أثناء حذف المنتج');
+                }
+            }
+        }
+        
+        // حذف طلب
+        async function deleteOrder(orderId) {
+            if (confirm('هل أنت متأكد من حذف هذا الطلب؟')) {
+                try {
+                    await db.collection('orders').doc(orderId).delete();
+                    
+                    // إضافة إشعار
+                    await addNotification('حذف طلب', `تم حذف طلب #${orderId.substring(0, 8)}`, 'warning');
+                    
+                    showSuccess('تم حذف الطلب بنجاح!');
+                    loadOrders();
+                    updateStats();
+                } catch (error) {
+                    console.error('Error deleting order:', error);
+                    showError('حدث خطأ أثناء حذف الطلب');
+                }
+            }
+        }
+        
+        // حذف إشعار
+        async function deleteNotification(notificationId) {
+            try {
+                await db.collection('notifications').doc(notificationId).delete();
+                loadNotifications();
+            } catch (error) {
+                console.error('Error deleting notification:', error);
+                showError('حدث خطأ أثناء حذف الإشعار');
+            }
+        }
+        
+        // حذف جميع الإشعارات
+        async function clearAllNotifications() {
+            if (confirm('هل أنت متأكد من حذف جميع الإشعارات؟')) {
+                try {
+                    const notificationsSnapshot = await db.collection('notifications').get();
+                    const batch = db.batch();
+                    
+                    notificationsSnapshot.forEach(doc => {
+                        batch.delete(doc.ref);
+                    });
+                    
+                    await batch.commit();
+                    
+                    showSuccess('تم حذف جميع الإشعارات بنجاح!');
+                    loadNotifications();
+                } catch (error) {
+                    console.error('Error clearing notifications:', error);
+                    showError('حدث خطأ أثناء حذف الإشعارات');
+                }
+            }
+        }
+        
+        // حفظ الإعدادات
+        async function saveSettings() {
+            try {
+                const settings = {
+                    storeName: document.getElementById('storeName').value,
+                    storePhone: document.getElementById('storePhone').value,
+                    storeWhatsapp: document.getElementById('storeWhatsapp').value,
+                    storeAddress: document.getElementById('storeAddress').value,
+                    shippingCost: parseFloat(document.getElementById('shippingCost').value),
+                    freeShipping: parseFloat(document.getElementById('freeShipping').value),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                await db.collection('settings').doc('storeSettings').set(settings, { merge: true });
+                
+                // إضافة إشعار
+                await addNotification('تحديث الإعدادات', 'تم تحديث إعدادات المتجر', 'success');
+                
+                showSuccess('تم حفظ الإعدادات بنجاح!');
+            } catch (error) {
+                console.error('Error saving settings:', error);
+                showError('حدث خطأ أثناء حفظ الإعدادات');
+            }
+        }
+        
+        // تصدير البيانات
+        async function exportData() {
+            try {
+                showLoading(true);
+                
+                // جمع جميع البيانات
+                const productsSnapshot = await db.collection('products').get();
+                const ordersSnapshot = await db.collection('orders').get();
+                
+                const exportData = {
+                    products: [],
+                    orders: [],
+                    exportDate: new Date().toISOString()
+                };
+                
+                productsSnapshot.forEach(doc => {
+                    exportData.products.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+                
+                ordersSnapshot.forEach(doc => {
+                    exportData.orders.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+                
+                // تحويل إلى JSON
+                const dataStr = JSON.stringify(exportData, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                
+                // إنشاء رابط للتحميل
+                const exportFileDefaultName = `store-backup-${new Date().toISOString().split('T')[0]}.json`;
+                const linkElement = document.createElement('a');
+                linkElement.setAttribute('href', dataUri);
+                linkElement.setAttribute('download', exportFileDefaultName);
+                linkElement.click();
+                
+                showSuccess('تم تصدير البيانات بنجاح!');
+            } catch (error) {
+                console.error('Error exporting data:', error);
+                showError('حدث خطأ أثناء تصدير البيانات');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // حذف جميع البيانات (حذر)
+        async function clearAllData() {
+            if (confirm('تحذير: هذا الإجراء سيحذف جميع المنتجات والطلبات والإشعارات. هل أنت متأكد؟')) {
+                const password = prompt('أدخل كلمة المرور للتأكيد:');
+                if (password !== '123456') {
+                    showError('كلمة المرور غير صحيحة');
+                    return;
+                }
+                
+                try {
+                    showLoading(true);
+                    
+                    // حذف جميع المستندات
+                    const collections = ['products', 'orders', 'notifications'];
+                    
+                    for (const collection of collections) {
+                        const snapshot = await db.collection(collection).get();
+                        const batch = db.batch();
+                        
+                        snapshot.forEach(doc => {
+                            batch.delete(doc.ref);
+                        });
+                        
+                        await batch.commit();
+                    }
+                    
+                    showSuccess('تم حذف جميع البيانات بنجاح!');
+                    
+                    // إعادة تحميل البيانات
+                    loadProducts();
+                    loadOrders();
+                    loadNotifications();
+                    updateStats();
+                    
+                } catch (error) {
+                    console.error('Error clearing data:', error);
+                    showError('حدث خطأ أثناء حذف البيانات');
+                } finally {
+                    showLoading(false);
                 }
             }
         }
@@ -755,6 +1437,12 @@
             successMessage.style.display = 'block';
             document.getElementById('errorMessage').style.display = 'none';
             
+            // إضافة إشعار صوتي
+            try {
+                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/286/286-preview.mp3');
+                audio.play();
+            } catch (e) {}
+            
             setTimeout(() => {
                 successMessage.style.display = 'none';
             }, 5000);
@@ -771,15 +1459,48 @@
             }, 5000);
         }
         
+        function getCategoryName(category) {
+            const categories = {
+                'electronics': 'إلكترونيات',
+                'fashion': 'موضة',
+                'home': 'منزل',
+                'sports': 'رياضة',
+                'beauty': 'جمال',
+                'food': 'أطعمة',
+                'books': 'كتب'
+            };
+            return categories[category] || category;
+        }
+        
         // الاستماع للتحديثات في الوقت الحقيقي
         db.collection('orders').onSnapshot(() => {
             updateOrdersBadge();
+            updateStats();
         });
         
-        // تحميل المنتجات عند فتح الصفحة
+        db.collection('products').onSnapshot(() => {
+            updateStats();
+        });
+        
+        // تحميل البيانات عند فتح الصفحة
         window.onload = function() {
             loadProducts();
+            loadNotifications();
             updateOrdersBadge();
+            updateStats();
+            
+            // تحميل الإعدادات
+            db.collection('settings').doc('storeSettings').get().then(doc => {
+                if (doc.exists) {
+                    const settings = doc.data();
+                    document.getElementById('storeName').value = settings.storeName || 'متجر أمين الزواحي';
+                    document.getElementById('storePhone').value = settings.storePhone || '0123456789';
+                    document.getElementById('storeWhatsapp').value = settings.storeWhatsapp || '0123456789';
+                    document.getElementById('storeAddress').value = settings.storeAddress || 'شارع التسوق، المدينة';
+                    document.getElementById('shippingCost').value = settings.shippingCost || 15;
+                    document.getElementById('freeShipping').value = settings.freeShipping || 100;
+                }
+            });
         };
     </script>
 </body>
