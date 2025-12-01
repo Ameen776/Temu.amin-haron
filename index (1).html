@@ -462,11 +462,11 @@
                     
                     <div class="loading" id="loading">
                         <div class="spinner"></div>
-                        <p id="loadingText">جاري رفع المنتج...</p>
+                        <p id="loadingText">جاري حفظ المنتج...</p>
                     </div>
                     
                     <button type="submit" class="btn" id="submitBtn">إضافة المنتج</button>
-                    <button type="button" class="btn btn-info" id="testConnection">اختبار الاتصال</button>
+                    <button type="button" class="btn btn-info" id="testConnection">اختبار الاتصال مع Firebase</button>
                     
                     <div class="success-message" id="successMessage">
                         تم إضافة المنتج بنجاح!
@@ -553,9 +553,6 @@
     </div>
 
     <script>
-        // مفتاح IMGBB API
-        const IMGBB_API_KEY = '106bfa911b347c746b009a38d629565b';
-        
         // تهيئة Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyA0KMF-nZh5Y5DsHt9MWCfTLmyMDnWSAFc",
@@ -626,63 +623,63 @@
             }
         });
         
-        // اختبار الاتصال
+        // تحويل الصورة إلى Base64 مع ضغط
+        function compressImage(base64String, maxWidth = 800, quality = 0.7) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    
+                    // تغيير الحجم إذا كان كبيراً
+                    if (width > maxWidth) {
+                        height = (height * maxWidth) / width;
+                        width = maxWidth;
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // تحويل إلى base64 مع جودة محددة
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+                    resolve(compressedBase64);
+                };
+                
+                img.src = base64String;
+            });
+        }
+        
+        // اختبار الاتصال مع Firebase
         document.getElementById('testConnection').addEventListener('click', async function() {
             try {
-                showLoading(true, 'جاري اختبار الاتصال...');
-                const testDoc = await db.collection('test').add({
+                showLoading(true, 'جاري اختبار الاتصال مع Firebase...');
+                
+                // اختبار بسيط لإضافة وحذف مستند
+                const testDoc = await db.collection('testConnection').add({
                     test: true,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 
-                await db.collection('test').doc(testDoc.id).delete();
+                showSuccess('✓ تم الاتصال بنجاح مع Firebase!');
                 
-                showSuccess('الاتصال مع Firebase يعمل بشكل صحيح!');
+                // حذف المستند الاختباري
+                await db.collection('testConnection').doc(testDoc.id).delete();
                 
-                // اختبار IMGBB API
-                const testResponse = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-                    method: 'POST',
-                    body: new FormData()
-                });
-                
-                if (testResponse.ok) {
-                    showSuccess('الاتصال مع IMGBB يعمل بشكل صحيح!');
-                } else {
-                    showError('فشل اختبار الاتصال مع IMGBB');
-                }
+                // اختبار قراءة البيانات
+                const productsSnapshot = await db.collection('products').limit(1).get();
+                showSuccess(`✓ تم قراءة ${productsSnapshot.size} منتج`);
                 
             } catch (error) {
                 console.error('Connection test failed:', error);
-                showError('فشل اختبار الاتصال: ' + error.message);
+                showError('✗ فشل الاتصال مع Firebase: ' + error.message);
             } finally {
                 showLoading(false);
             }
         });
-        
-        // رفع الصورة إلى IMGBB
-        async function uploadImageToIMGBB(file) {
-            return new Promise((resolve, reject) => {
-                const formData = new FormData();
-                formData.append('key', IMGBB_API_KEY);
-                formData.append('image', file);
-                
-                fetch('https://api.imgbb.com/1/upload', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        resolve(data.data.url);
-                    } else {
-                        reject(new Error(data.error?.message || 'فشل رفع الصورة'));
-                    }
-                })
-                .catch(error => {
-                    reject(error);
-                });
-            });
-        }
         
         // إضافة منتج جديد
         document.getElementById('productForm').addEventListener('submit', async function(e) {
@@ -707,11 +704,39 @@
             }
             
             // إظهار تحميل
-            showLoading(true, 'جاري رفع الصورة إلى IMGBB...');
+            showLoading(true, 'جاري إضافة المنتج...');
             
             try {
-                // رفع الصورة إلى IMGBB
-                const imageUrl = await uploadImageToIMGBB(productImage);
+                let imageUrl;
+                
+                // إذا كانت الصورة صغيرة (أقل من 1MB)، احفظها كـ Base64 مباشرة
+                if (productImage.size < 1024 * 1024) { // 1MB
+                    const reader = new FileReader();
+                    
+                    imageUrl = await new Promise((resolve, reject) => {
+                        reader.onload = function(e) {
+                            resolve(e.target.result);
+                        };
+                        reader.onerror = reject;
+                        reader.readAsDataURL(productImage);
+                    });
+                } else {
+                    // إذا كانت الصورة كبيرة، قم بضغطها
+                    const reader = new FileReader();
+                    
+                    imageUrl = await new Promise((resolve, reject) => {
+                        reader.onload = async function(e) {
+                            try {
+                                const compressedImage = await compressImage(e.target.result, 800, 0.6);
+                                resolve(compressedImage);
+                            } catch (compressError) {
+                                reject(compressError);
+                            }
+                        };
+                        reader.onerror = reject;
+                        reader.readAsDataURL(productImage);
+                    });
+                }
                 
                 // تحديث نص التحميل
                 document.getElementById('loadingText').textContent = 'جاري حفظ المنتج في قاعدة البيانات...';
@@ -723,7 +748,7 @@
                     description: productDescription,
                     category: productCategory,
                     stock: parseInt(productStock),
-                    imageUrl: imageUrl,
+                    imageUrl: imageUrl, // حفظ كـ Base64
                     status: 'approved',
                     approved: true,
                     featured: false,
@@ -1356,9 +1381,12 @@
                 };
                 
                 productsSnapshot.forEach(doc => {
+                    const product = doc.data();
+                    // عدم تضمين الصور في التصدير لأنها كبيرة
+                    const { imageUrl, ...productWithoutImage } = product;
                     exportData.products.push({
                         id: doc.id,
-                        ...doc.data()
+                        ...productWithoutImage
                     });
                 });
                 
