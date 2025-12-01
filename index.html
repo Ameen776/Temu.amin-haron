@@ -35,7 +35,6 @@
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -577,7 +576,7 @@
                 <option value="الأردن">الأردن</option>
                 <option value="الجزائر">الجزائر</option>
                 <option value="المغرب">المغرب</option>
-                <option value="الكويت">الكويت</option>
+                                                <option value="الكويت">الكويت</option>
                 <option value="قطر">قطر</option>
                 <option value="عمان">عمان</option>
                 <option value="البحرين">البحرين</option>
@@ -853,13 +852,6 @@
     </div>
 
     <script>
-        // اختبار وسوم Open Graph
-        console.log('=== Open Graph Meta Tags Test ===');
-        const metaTags = document.querySelectorAll('meta[property^="og:"], meta[property^="twitter:"]');
-        metaTags.forEach(tag => {
-            console.log(`${tag.getAttribute('property')}: ${tag.getAttribute('content')}`);
-        });
-
         // تهيئة Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyA0KMF-nZh5Y5DsHt9MWCfTLmyMDnWSAFc",
