@@ -7,8 +7,6 @@
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-storage-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-messaging-compat.js"></script>
     <style>
         * {
             margin: 0;
@@ -464,7 +462,7 @@
                     
                     <div class="loading" id="loading">
                         <div class="spinner"></div>
-                        <p>جاري رفع المنتج...</p>
+                        <p id="loadingText">جاري رفع المنتج...</p>
                     </div>
                     
                     <button type="submit" class="btn" id="submitBtn">إضافة المنتج</button>
@@ -555,7 +553,10 @@
     </div>
 
     <script>
-        // تهيئة Firebase باستخدام الكود الصحيح
+        // مفتاح IMGBB API
+        const IMGBB_API_KEY = '106bfa911b347c746b009a38d629565b';
+        
+        // تهيئة Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyA0KMF-nZh5Y5DsHt9MWCfTLmyMDnWSAFc",
             authDomain: "temo2-2e66e.firebaseapp.com",
@@ -571,7 +572,7 @@
             if (!firebase.apps.length) {
                 firebase.initializeApp(firebaseConfig);
             } else {
-                firebase.app(); // إذا كان مثبتاً بالفعل
+                firebase.app();
             }
         } catch (error) {
             console.error('Error initializing Firebase:', error);
@@ -579,7 +580,6 @@
         
         // الحصول على مراجع Firebase
         const db = firebase.firestore();
-        const storage = firebase.storage();
         
         // متغيرات النظام
         let currentOrdersFilter = 'all';
@@ -587,16 +587,13 @@
         // نظام التبويبات
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', function() {
-                // إزالة النشاط من جميع التبويبات
                 document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
                 
-                // إضافة النشاط للتبويب المحدد
                 this.classList.add('active');
                 const tabId = this.getAttribute('data-tab');
                 document.getElementById(`${tabId}-tab`).classList.add('active');
                 
-                // إذا كان تبويب الطلبات، قم بتحميل الطلبات
                 if (tabId === 'orders') {
                     loadOrders();
                 } else if (tabId === 'notifications') {
@@ -632,25 +629,27 @@
         // اختبار الاتصال
         document.getElementById('testConnection').addEventListener('click', async function() {
             try {
-                showLoading(true);
-                // اختبار الاتصال مع Firestore
+                showLoading(true, 'جاري اختبار الاتصال...');
                 const testDoc = await db.collection('test').add({
                     test: true,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 
-                // حذف المستند الاختباري
                 await db.collection('test').doc(testDoc.id).delete();
                 
                 showSuccess('الاتصال مع Firebase يعمل بشكل صحيح!');
                 
-                // اختبار Storage
-                const testFile = new Blob(['test'], { type: 'text/plain' });
-                const storageRef = storage.ref('test/test.txt');
-                await storageRef.put(testFile);
-                await storageRef.delete();
+                // اختبار IMGBB API
+                const testResponse = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+                    method: 'POST',
+                    body: new FormData()
+                });
                 
-                showSuccess('التخزين يعمل بشكل صحيح!');
+                if (testResponse.ok) {
+                    showSuccess('الاتصال مع IMGBB يعمل بشكل صحيح!');
+                } else {
+                    showError('فشل اختبار الاتصال مع IMGBB');
+                }
                 
             } catch (error) {
                 console.error('Connection test failed:', error);
@@ -659,6 +658,31 @@
                 showLoading(false);
             }
         });
+        
+        // رفع الصورة إلى IMGBB
+        async function uploadImageToIMGBB(file) {
+            return new Promise((resolve, reject) => {
+                const formData = new FormData();
+                formData.append('key', IMGBB_API_KEY);
+                formData.append('image', file);
+                
+                fetch('https://api.imgbb.com/1/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        resolve(data.data.url);
+                    } else {
+                        reject(new Error(data.error?.message || 'فشل رفع الصورة'));
+                    }
+                })
+                .catch(error => {
+                    reject(error);
+                });
+            });
+        }
         
         // إضافة منتج جديد
         document.getElementById('productForm').addEventListener('submit', async function(e) {
@@ -683,14 +707,14 @@
             }
             
             // إظهار تحميل
-            showLoading(true);
+            showLoading(true, 'جاري رفع الصورة إلى IMGBB...');
             
             try {
-                // رفع الصورة إلى Firebase Storage
-                const imageName = Date.now() + '_' + productImage.name;
-                const storageRef = storage.ref('products/' + imageName);
-                const snapshot = await storageRef.put(productImage);
-                const imageUrl = await snapshot.ref.getDownloadURL();
+                // رفع الصورة إلى IMGBB
+                const imageUrl = await uploadImageToIMGBB(productImage);
+                
+                // تحديث نص التحميل
+                document.getElementById('loadingText').textContent = 'جاري حفظ المنتج في قاعدة البيانات...';
                 
                 // إضافة بيانات المنتج إلى Firestore
                 const productData = {
@@ -800,7 +824,6 @@
                 const ordersContainer = document.getElementById('ordersContainer');
                 let query = db.collection('orders').orderBy('createdAt', 'desc');
                 
-                // تطبيق الفلتر
                 if (currentOrdersFilter !== 'all') {
                     query = query.where('status', '==', currentOrdersFilter);
                 }
@@ -875,7 +898,6 @@
                     ordersContainer.appendChild(orderItem);
                 });
                 
-                // تحديث عدد الطلبات الجديدة
                 updateOrdersBadge();
                 
             } catch (error) {
@@ -939,7 +961,6 @@
                     notificationsContainer.appendChild(notificationItem);
                 });
                 
-                // تحديث شارة الإشعارات
                 updateNotificationsBadge();
                 
             } catch (error) {
@@ -1006,17 +1027,14 @@
         // تحديث الإحصائيات
         async function updateStats() {
             try {
-                // إجمالي المنتجات
                 const productsSnapshot = await db.collection('products').get();
                 document.getElementById('totalProducts').textContent = productsSnapshot.size;
                 
-                // الطلبات الجديدة (قيد الانتظار)
                 const pendingOrdersSnapshot = await db.collection('orders')
                     .where('status', '==', 'pending')
                     .get();
                 document.getElementById('newOrders').textContent = pendingOrdersSnapshot.size;
                 
-                // المبيعات اليوم
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
                 
@@ -1032,7 +1050,6 @@
                 });
                 document.getElementById('todaySales').textContent = todaySales.toFixed(2) + ' ر.س';
                 
-                // إجمالي المبيعات
                 const allOrdersSnapshot = await db.collection('orders')
                     .where('status', '==', 'completed')
                     .get();
@@ -1058,7 +1075,6 @@
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 
-                // إضافة إشعار
                 const productDoc = await db.collection('products').doc(productId).get();
                 const productName = productDoc.data()?.name || 'منتج';
                 await addNotification('موافقة على منتج', `تمت الموافقة على المنتج: ${productName}`, 'success');
@@ -1136,11 +1152,15 @@
             const newDescription = prompt('أدخل الوصف الجديد للمنتج:', product.description);
             if (!newDescription) return;
             
+            const newStock = prompt('أدخل الكمية الجديدة للمنتج:', product.stock || 0);
+            if (!newStock) return;
+            
             try {
                 await db.collection('products').doc(productId).update({
                     name: newName,
                     price: parseFloat(newPrice),
                     description: newDescription,
+                    stock: parseInt(newStock),
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 
@@ -1168,7 +1188,6 @@
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
                     
-                    // إضافة إشعار
                     const orderDoc = await db.collection('orders').doc(orderId).get();
                     const orderNumber = orderId.substring(0, 8);
                     await addNotification('تحديث حالة الطلب', `تم تحديث حالة الطلب #${orderNumber} إلى ${statusText}`, 'info');
@@ -1235,7 +1254,6 @@
                 try {
                     await db.collection('products').doc(productId).delete();
                     
-                    // إضافة إشعار
                     await addNotification('حذف منتج', 'تم حذف منتج من المتجر', 'warning');
                     
                     showSuccess('تم حذف المنتج بنجاح!');
@@ -1254,7 +1272,6 @@
                 try {
                     await db.collection('orders').doc(orderId).delete();
                     
-                    // إضافة إشعار
                     await addNotification('حذف طلب', `تم حذف طلب #${orderId.substring(0, 8)}`, 'warning');
                     
                     showSuccess('تم حذف الطلب بنجاح!');
@@ -1315,7 +1332,6 @@
                 
                 await db.collection('settings').doc('storeSettings').set(settings, { merge: true });
                 
-                // إضافة إشعار
                 await addNotification('تحديث الإعدادات', 'تم تحديث إعدادات المتجر', 'success');
                 
                 showSuccess('تم حفظ الإعدادات بنجاح!');
@@ -1328,9 +1344,8 @@
         // تصدير البيانات
         async function exportData() {
             try {
-                showLoading(true);
+                showLoading(true, 'جاري تصدير البيانات...');
                 
-                // جمع جميع البيانات
                 const productsSnapshot = await db.collection('products').get();
                 const ordersSnapshot = await db.collection('orders').get();
                 
@@ -1354,11 +1369,9 @@
                     });
                 });
                 
-                // تحويل إلى JSON
                 const dataStr = JSON.stringify(exportData, null, 2);
                 const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
                 
-                // إنشاء رابط للتحميل
                 const exportFileDefaultName = `store-backup-${new Date().toISOString().split('T')[0]}.json`;
                 const linkElement = document.createElement('a');
                 linkElement.setAttribute('href', dataUri);
@@ -1374,7 +1387,7 @@
             }
         }
         
-        // حذف جميع البيانات (حذر)
+        // حذف جميع البيانات
         async function clearAllData() {
             if (confirm('تحذير: هذا الإجراء سيحذف جميع المنتجات والطلبات والإشعارات. هل أنت متأكد؟')) {
                 const password = prompt('أدخل كلمة المرور للتأكيد:');
@@ -1384,9 +1397,8 @@
                 }
                 
                 try {
-                    showLoading(true);
+                    showLoading(true, 'جاري حذف البيانات...');
                     
-                    // حذف جميع المستندات
                     const collections = ['products', 'orders', 'notifications'];
                     
                     for (const collection of collections) {
@@ -1402,7 +1414,6 @@
                     
                     showSuccess('تم حذف جميع البيانات بنجاح!');
                     
-                    // إعادة تحميل البيانات
                     loadProducts();
                     loadOrders();
                     loadNotifications();
@@ -1418,11 +1429,13 @@
         }
         
         // وظائف المساعدة
-        function showLoading(show) {
+        function showLoading(show, text = 'جاري المعالجة...') {
             const loading = document.getElementById('loading');
+            const loadingText = document.getElementById('loadingText');
             const submitBtn = document.getElementById('submitBtn');
             
             if (show) {
+                loadingText.textContent = text;
                 loading.style.display = 'block';
                 submitBtn.disabled = true;
             } else {
@@ -1437,9 +1450,9 @@
             successMessage.style.display = 'block';
             document.getElementById('errorMessage').style.display = 'none';
             
-            // إضافة إشعار صوتي
             try {
                 const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/286/286-preview.mp3');
+                audio.volume = 0.3;
                 audio.play();
             } catch (e) {}
             
@@ -1489,7 +1502,6 @@
             updateOrdersBadge();
             updateStats();
             
-            // تحميل الإعدادات
             db.collection('settings').doc('storeSettings').get().then(doc => {
                 if (doc.exists) {
                     const settings = doc.data();
