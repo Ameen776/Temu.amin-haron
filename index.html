@@ -1740,13 +1740,19 @@
             }
         } catch (error) {
             console.error('Firebase initialization error:', error);
+            showToast('خطأ في تهيئة قاعدة البيانات', 'error');
         }
 
         // Firebase services
         const auth = firebase.auth();
         const db = firebase.firestore();
-        const GoogleAuthProvider = new firebase.auth.GoogleAuthProvider();
-
+        
+        // Important: Configure Google Auth Provider
+        const googleProvider = new firebase.auth.GoogleAuthProvider();
+        googleProvider.setCustomParameters({
+            prompt: 'select_account'
+        });
+        
         // App State
         let currentUser = null;
         let userProfile = null;
@@ -1772,14 +1778,12 @@
             
             document.body.appendChild(toast);
             
-            // Remove toast after duration
             setTimeout(() => {
                 toast.style.opacity = '0';
                 toast.style.transform = 'translateX(-50%) translateY(-100px)';
                 setTimeout(() => toast.remove(), 300);
             }, duration);
             
-            // Auto remove after 5 seconds max
             setTimeout(() => {
                 if (toast.parentNode) toast.remove();
             }, 5000);
@@ -1806,23 +1810,43 @@
             document.getElementById('splashScreen').style.opacity = '0';
             setTimeout(() => {
                 document.getElementById('splashScreen').style.display = 'none';
+                // Check if user is already logged in
+                auth.onAuthStateChanged(handleAuthStateChange);
             }, 500);
         }, 2000);
 
-        // Auth State Listener
-        auth.onAuthStateChanged(async (user) => {
+        // Handle Authentication State Changes
+        async function handleAuthStateChange(user) {
             if (user) {
                 currentUser = user;
+                console.log('User signed in:', user.email);
                 
-                // Check if email is verified
-                if (!user.emailVerified) {
+                // IMPORTANT: Check email verification status
+                console.log('Email verified:', user.emailVerified);
+                
+                // Check if email is verified - TEMPORARILY DISABLED FOR TESTING
+                const requireEmailVerification = false; // Change to true when email sending works
+                
+                if (requireEmailVerification && !user.emailVerified) {
                     document.getElementById('authScreen').style.display = 'none';
                     document.getElementById('verificationScreen').style.display = 'flex';
                     document.getElementById('mainContent').style.display = 'none';
+                    
+                    // Send verification email if not already sent
+                    if (!localStorage.getItem(`verification_sent_${user.uid}`)) {
+                        try {
+                            await user.sendEmailVerification();
+                            localStorage.setItem(`verification_sent_${user.uid}`, 'true');
+                            showToast('تم إرسال رابط التحقق إلى بريدك الإلكتروني', 'info');
+                        } catch (error) {
+                            console.error('Error sending verification email:', error);
+                            showToast('تعذر إرسال رابط التحقق. يرجى المحاولة لاحقاً', 'error');
+                        }
+                    }
                     return;
                 }
                 
-                // Email is verified, load user profile
+                // Email is verified or verification disabled, load user profile
                 await loadUserProfile(user.uid);
                 
                 // Show main content
@@ -1831,9 +1855,9 @@
                 document.getElementById('mainContent').style.display = 'block';
                 
                 // Load data
-                loadProducts();
+                await loadProducts();
                 loadCart();
-                loadOrders();
+                await loadOrders();
                 
             } else {
                 // No user is signed in
@@ -1848,7 +1872,7 @@
                 orders = [];
                 updateCartDisplay();
             }
-        });
+        }
 
         // Load user profile from Firestore
         async function loadUserProfile(uid) {
@@ -1864,7 +1888,9 @@
                         email: currentUser.email,
                         phone: '',
                         address: '',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        photoURL: currentUser.photoURL || '',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     };
                     await saveUserProfile(uid);
                 }
@@ -1878,6 +1904,7 @@
         async function saveUserProfile(uid) {
             try {
                 await db.collection('users').doc(uid).set(userProfile, { merge: true });
+                console.log('User profile saved:', uid);
             } catch (error) {
                 console.error('Error saving user profile:', error);
                 showToast('حدث خطأ في حفظ الملف الشخصي', 'error');
@@ -1921,6 +1948,11 @@
                 return;
             }
             
+            if (!email.includes('@') || !email.includes('.')) {
+                showToast('البريد الإلكتروني غير صالح', 'error');
+                return;
+            }
+            
             const registerBtn = document.getElementById('registerBtn');
             const registerLoading = document.getElementById('registerLoading');
             
@@ -1933,8 +1965,17 @@
                 const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                 const user = userCredential.user;
                 
+                console.log('User created:', user.uid);
+                
                 // Send email verification
-                await user.sendEmailVerification();
+                try {
+                    await user.sendEmailVerification();
+                    console.log('Verification email sent');
+                    showToast('تم إرسال رابط التحقق إلى بريدك الإلكتروني', 'success');
+                } catch (emailError) {
+                    console.warn('Could not send verification email:', emailError);
+                    showToast('تم إنشاء الحساب ولكن تعذر إرسال رابط التحقق', 'warning');
+                }
                 
                 // Create user profile in Firestore
                 userProfile = {
@@ -1948,11 +1989,15 @@
                 
                 await db.collection('users').doc(user.uid).set(userProfile);
                 
-                showToast('تم إنشاء الحساب بنجاح! يرجى التحقق من بريدك الإلكتروني', 'success');
+                // IMPORTANT: Sign out and ask user to verify email
+                // await auth.signOut();
+                // showToast('تم إنشاء الحساب! يرجى التحقق من بريدك الإلكتروني ثم تسجيل الدخول', 'success');
+                // document.getElementById('authScreen').style.display = 'flex';
+                // document.getElementById('verificationScreen').style.display = 'none';
                 
-                // Switch to verification screen
-                document.getElementById('authScreen').style.display = 'none';
-                document.getElementById('verificationScreen').style.display = 'flex';
+                // TEMPORARY: Auto login without email verification for testing
+                showToast('تم إنشاء الحساب بنجاح!', 'success');
+                // Continue to main content
                 
             } catch (error) {
                 console.error('Registration error:', error);
@@ -1964,9 +2009,15 @@
                     errorMessage = 'البريد الإلكتروني غير صالح';
                 } else if (error.code === 'auth/weak-password') {
                     errorMessage = 'كلمة المرور ضعيفة جداً';
+                } else if (error.code === 'auth/operation-not-allowed') {
+                    errorMessage = 'تسجيل البريد الإلكتروني غير مفعّل في الإعدادات';
                 }
                 
                 showToast(errorMessage, 'error');
+                
+                // Reset form on error
+                document.getElementById('registerPassword').value = '';
+                document.getElementById('registerConfirmPassword').value = '';
                 
             } finally {
                 registerBtn.querySelector('span').style.display = 'inline';
@@ -1993,11 +2044,20 @@
                 const userCredential = await auth.signInWithEmailAndPassword(email, password);
                 const user = userCredential.user;
                 
-                if (!user.emailVerified) {
+                console.log('User logged in:', user.email);
+                
+                // Check email verification - TEMPORARILY DISABLED
+                const requireEmailVerification = false;
+                
+                if (requireEmailVerification && !user.emailVerified) {
+                    // Send verification email if not verified
+                    try {
+                        await user.sendEmailVerification();
+                        showToast('يرجى التحقق من بريدك الإلكتروني أولاً. تم إرسال رابط جديد', 'warning');
+                    } catch (emailError) {
+                        showToast('يرجى التحقق من بريدك الإلكتروني أولاً', 'warning');
+                    }
                     await auth.signOut();
-                    showToast('يرجى التحقق من بريدك الإلكتروني أولاً', 'warning');
-                    document.getElementById('authScreen').style.display = 'none';
-                    document.getElementById('verificationScreen').style.display = 'flex';
                     return;
                 }
                 
@@ -2013,9 +2073,16 @@
                     errorMessage = 'كلمة المرور غير صحيحة';
                 } else if (error.code === 'auth/too-many-requests') {
                     errorMessage = 'محاولات تسجيل دخول كثيرة، حاول لاحقاً';
+                } else if (error.code === 'auth/user-disabled') {
+                    errorMessage = 'تم تعطيل حسابك';
+                } else if (error.code === 'auth/invalid-email') {
+                    errorMessage = 'البريد الإلكتروني غير صالح';
                 }
                 
                 showToast(errorMessage, 'error');
+                
+                // Reset password field on error
+                document.getElementById('loginPassword').value = '';
                 
             } finally {
                 loginBtn.querySelector('span').style.display = 'inline';
@@ -2027,32 +2094,65 @@
         // Google Authentication
         async function signInWithGoogle() {
             try {
-                const result = await auth.signInWithPopup(GoogleAuthProvider);
+                console.log('Starting Google sign in...');
+                
+                // Set language to Arabic
+                firebase.auth().languageCode = 'ar';
+                
+                const result = await auth.signInWithPopup(googleProvider);
                 const user = result.user;
+                
+                console.log('Google user signed in:', user.email);
+                console.log('User data:', {
+                    uid: user.uid,
+                    email: user.email,
+                    displayName: user.displayName,
+                    photoURL: user.photoURL,
+                    emailVerified: user.emailVerified
+                });
                 
                 // Check if user exists in Firestore
                 const userDoc = await db.collection('users').doc(user.uid).get();
                 
                 if (!userDoc.exists) {
+                    console.log('Creating new user profile for Google user');
                     // Create new user profile for Google sign-in
                     userProfile = {
-                        name: user.displayName,
+                        name: user.displayName || user.email.split('@')[0],
                         email: user.email,
                         phone: '',
                         address: '',
-                        photoURL: user.photoURL,
+                        photoURL: user.photoURL || '',
+                        provider: 'google',
+                        emailVerified: user.emailVerified,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     };
                     
                     await db.collection('users').doc(user.uid).set(userProfile);
+                    console.log('User profile created for Google user');
+                } else {
+                    console.log('User profile already exists');
+                    userProfile = userDoc.data();
                 }
                 
                 showToast('تم تسجيل الدخول بنجاح!', 'success');
                 
             } catch (error) {
                 console.error('Google sign-in error:', error);
-                showToast('حدث خطأ أثناء تسجيل الدخول بحساب Google', 'error');
+                
+                let errorMessage = 'حدث خطأ أثناء تسجيل الدخول بحساب Google';
+                if (error.code === 'auth/popup-closed-by-user') {
+                    errorMessage = 'تم إغلاق نافذة التسجيل';
+                } else if (error.code === 'auth/cancelled-popup-request') {
+                    errorMessage = 'تم إلغاء عملية التسجيل';
+                } else if (error.code === 'auth/popup-blocked') {
+                    errorMessage = 'تم حظر النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة';
+                } else if (error.code === 'auth/unauthorized-domain') {
+                    errorMessage = 'هذا النطاق غير مصرح به. يرجى إضافته في إعدادات Firebase';
+                }
+                
+                showToast(errorMessage, 'error');
             }
         }
 
@@ -2084,6 +2184,7 @@
         document.getElementById('logoutFromVerificationBtn').addEventListener('click', async () => {
             try {
                 await auth.signOut();
+                showToast('تم تسجيل الخروج', 'info');
             } catch (error) {
                 console.error('Logout error:', error);
             }
@@ -2157,6 +2258,8 @@
                     products.push(product);
                 });
                 
+                console.log(`Loaded ${products.length} products`);
+                
                 displayProducts(products);
                 
             } catch (error) {
@@ -2227,7 +2330,9 @@
 
         // Cart functionality
         function loadCart() {
-            const savedCart = localStorage.getItem(`cart_${currentUser?.uid}`);
+            if (!currentUser) return;
+            
+            const savedCart = localStorage.getItem(`cart_${currentUser.uid}`);
             cart = savedCart ? JSON.parse(savedCart) : [];
             updateCartDisplay();
         }
@@ -2239,6 +2344,12 @@
         }
 
         function addToCart(productId) {
+            // Check if user is logged in
+            if (!currentUser) {
+                showToast('يرجى تسجيل الدخول أولاً لإضافة المنتجات إلى السلة', 'error');
+                return;
+            }
+            
             const product = products.find(p => p.id === productId);
             
             if (!product) {
@@ -2653,11 +2764,19 @@
 
         // Modal controls
         document.getElementById('cartIcon').addEventListener('click', () => {
+            if (!currentUser) {
+                showToast('يرجى تسجيل الدخول أولاً لعرض السلة', 'error');
+                return;
+            }
             updateCartDisplay();
             document.getElementById('cartModal').style.display = 'flex';
         });
 
         document.getElementById('ordersIcon').addEventListener('click', () => {
+            if (!currentUser) {
+                showToast('يرجى تسجيل الدخول أولاً لعرض الطلبات', 'error');
+                return;
+            }
             loadOrders();
             document.getElementById('ordersModal').style.display = 'flex';
         });
@@ -2690,19 +2809,9 @@
             });
         });
 
-        // Real-time updates for products
-        db.collection('products').onSnapshot(() => {
-            if (currentUser && currentUser.emailVerified) {
-                loadProducts();
-            }
-        });
-
         // Initial load
         window.addEventListener('DOMContentLoaded', () => {
-            // Check if user is already logged in
-            if (auth.currentUser) {
-                auth.currentUser.reload();
-            }
+            console.log('Store initialized');
         });
     </script>
 </body>
